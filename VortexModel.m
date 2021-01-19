@@ -21,7 +21,7 @@ function VortexModel(Opt, Duration, n, alpha, SurgeProfile, FinalSpeed, ...
 
 % Girguis Sedky
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
+% test edit
 %% Intialize Code
 % Define Parameters
 deg2rad = pi/180;                        % Change degrees to radians
