@@ -1,4 +1,4 @@
-function VortexModel(Opt, Duration, n, alpha, SurgeProfile, FinalSpeed, ...
+function VortexModel(Opt, Duration, n, alpha_input, SurgeProfile, FinalSpeed, ...
                      Acceleration, PitchProfile, Pivot, omega, GustOpt, ...
                      GustWidth, GustType, C, X_initial, xmin, xmax, ymin,...
                      ymax, clmin, clmax, GR, Pivot_sin, omega_sin, ...
@@ -21,11 +21,11 @@ function VortexModel(Opt, Duration, n, alpha, SurgeProfile, FinalSpeed, ...
 
 % Girguis Sedky
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% test edit
+
 %% Intialize Code
 % Define Parameters
 deg2rad = pi/180;                        % Change degrees to radians
-alpha = alpha*deg2rad;                   % AoA in radians
+alpha = alpha_input*deg2rad;                   % AoA in radians
 % memory allocation
 C_l = 0;                                 % Allocate memore to the coefficicient of lift
 I_y_old = 0;
@@ -149,14 +149,11 @@ set(gca,'TickLabelInterpreter', 'latex','FontSize',20);
 ylim([ymin ymax]);
 xlim([xmin xmax]);
 grid on;
-if strcmp('On', GustOpt)
-    h(4) = plot([-X_initial, -X_initial],[ymin ymax],'k');
-    h(5) = plot([-X_initial - GustWidth, -X_initial - GustWidth],[ymin ymax],'k');
-end
+
 
 % plot instantaeous lift evolution
 subplot(2,1,2)
-h(6) = plot(0,0,'k','LineWidth',2);
+h(6) = plot(0,0,'.');
 xlabel('Time, s','Fontsize',25,'interpreter','latex');
 ylabel('$C_l$','Fontsize',25,'interpreter','latex');
 xlim([0 Duration]);
@@ -282,18 +279,22 @@ for ii=1:length(U)
     x_neg = vs.X{ii}(vs.G{ii}<0);
     y_neg = vs.Y{ii}(vs.G{ii}<0);
     
+    if strcmp('On', GustOpt)
+        % plot the gust patch
+        eval('PlotPatch_FlowField');
+    end
+    
     set(h(1),'xData',c.X{ii},'yData',c.Y{ii});
     set(h(2),'xData',x_pos,'yData',y_pos);
     set(h(3),'xData',x_neg,'yData',y_neg);
     
-    if strcmp('On', GustOpt)
-        set(h(4),'xData',[-X_initial+U_final*Time(ii), -X_initial+U_final*Time(ii)],'yData',[ymin, ymax]);
-        set(h(5),'xData',[-X_initial+U_final*Time(ii) - GustWidth, -X_initial+U_final*Time(ii) - GustWidth],'yData',[ymin, ymax]);
-    end
+ 
+    
+    
     
     % plot the coefficient of lift
     subplot(2,1,2);
-    set(h(6),'xData',Time(1:ii),'yData',C_l(1:ii),'LineWidth',2);
+    set(h(6),'xData',Time(1:ii),'yData',C_l(1:ii));
     drawnow;
     M(ii) = getframe(fig1);
     writeVideo(v,M(ii));
@@ -318,16 +319,18 @@ for ii=1:length(U)
 end
 close(v);
 
-%% Save shit
-save('Data.mat','Opt', 'Duration', 'n', 'alpha', 'SurgeProfile', 'FinalSpeed', 'PitchProfile', 'GustOpt','C','C_l','alpha','Time','C','U','V','vb','vs','c');
+%% Save 
+% Write options used into a text file
+fileID = fopen('Parameters.txt','w');
+TXT = 'Opt = %s \nDuration = %.2f \nn = %.2f \nalpha = %.2f \nSurgeProfile = %s \nFinalSpeed = %.2f \nAcceleration = %.2f \nPitchProfile = %s \nGustOpt = %s \nGustWidth = %.2f \nGustType = %s \nGR = %.2f \nC = %.2f \nPivot = %.2f \nomega = %.2f \nPivot_sin = %.2f \nomega_sin = %.2f \nPitchAmplitude = %.2f \nPivot_Control = %.2f \nK_p = %.2f';
+fprintf(fileID,TXT,Opt,Duration,n,alpha_input,SurgeProfile,FinalSpeed,Acceleration,PitchProfile,GustOpt,GustWidth, GustType,GR,C,Pivot,omega,Pivot_sin,omega_sin,PitchAmplitude,Pivot_Control,K_p);
 
-% save pitching data
-if strcmp('Constant', PitchProfile)
-    save('Data.mat','Pivot', 'omega', '-append')
-elseif strcmp('Sinusoidal', PitchProfile)
-    save('Data.mat','Pivot_sin', 'omega_sin','PitchAmplitude', '-append')
-elseif strcmp('Closed-loop', PitchProfile)
-    save('Data.mat','Pivot_Control', 'K_p','u', '-append')
+
+fclose(fileID);
+% save the data
+save('Data.mat','C_l','alpha','Time','C','U','V','vb','vs','c');
+if strcmp('Closed-loop', PitchProfile)
+    save('Data.mat','u', '-append')
 end
 close all;
 end

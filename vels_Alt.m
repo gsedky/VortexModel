@@ -2,7 +2,6 @@
 % Function to find the velocity induced at arbitrary points in the domain
 % due to the location and strength of vortices
 % keep induced velocity below critical radius constant
-%Hi
 function[u,  v] = vels_Alt(x,y,xv,yv,Gamma,r_c)
 % Intialize u and v
 % u and v are both row vectors with each column corresponding to a location
