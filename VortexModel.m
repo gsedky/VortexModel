@@ -2,7 +2,7 @@ function VortexModel(Opt, Duration, n, alpha_input, SurgeProfile, FinalSpeed, ..
                      Acceleration, PitchProfile, Pivot, omega, GustOpt, ...
                      GustWidth, GustType, C, X_initial, xmin, xmax, ymin,...
                      ymax, clmin, clmax, GR, Pivot_sin, omega_sin, ...
-                     PitchAmplitude, Pivot_Control, K_p)
+                     PitchAmplitude, Pivot_Control, K_p, RS)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % This script will serve as the main script to my vortex model code. The
 % aim here is to be able to model the lift on a wing encountering a gust.
@@ -183,12 +183,12 @@ for ii=1:length(U)
         
         
         c.Vp_b{ii} = -omega(ii)*(c.X{1}-a);
-        %vb.Vp_b{ii} = -omega(ii)*(vb.X{1}-a);
-        eps = C_l_ref-C_l(ii);
-        omega_old = omega(ii);
-        alpha_old = alpha(ii);
+        vb.Vp_b{ii} = -omega(ii)*(vb.X{1}-a);
+
     end
     
+    
+
     
     %% Find the vertical velocity induced by the gust on control points , bound vortices and shed vorticity
     % This application of the gust velocity field is from AIAA 2019
@@ -221,15 +221,38 @@ for ii=1:length(U)
             V_b(term_1>0 & term_1<1) = V_b(term_1>0 & term_1<1) + GR*U_final;
             % shed vortices
             V_s(term_2>0 & term_2<1) = V_s(term_2>0 & term_2<1) + GR*U_final;
+        elseif strcmp('Trapezoid', GustType)
+            % Control points
+            index1=find(U_final*Time(ii)-X_initial-c.X{ii}<GR*U_final/RS & U_final*Time(ii)-X_initial-c.X{ii}>0);
+            index2=find(U_final*Time(ii)-X_initial-c.X{ii}>GR*U_final/RS & U_final*Time(ii)-X_initial-c.X{ii}<GustWidth-GR*U_final/RS);
+            index3=find(U_final*Time(ii)-X_initial-c.X{ii}>GustWidth-GR*U_final/RS & U_final*Time(ii)-X_initial-c.X{ii}<GustWidth);
+            V_cp(index1) = V_cp(index1) + RS*(U_final*Time(ii)-X_initial-c.X{ii}(index1));
+            V_cp(index2) = V_cp(index2) + GR*U_final;
+            V_cp(index3) = V_cp(index3) + -RS*(U_final*Time(ii)-X_initial-c.X{ii}(index3)-GustWidth);
+            
+            % bound vortices
+            index1=find(U_final*Time(ii)-X_initial-vb.X{ii}<GR*U_final/RS & U_final*Time(ii)-X_initial-vb.X{ii}>0);
+            index2=find(U_final*Time(ii)-X_initial-vb.X{ii}>GR*U_final/RS & U_final*Time(ii)-X_initial-vb.X{ii}<GustWidth-GR*U_final/RS);
+            index3=find(U_final*Time(ii)-X_initial-vb.X{ii}>GustWidth-GR*U_final/RS & U_final*Time(ii)-X_initial-vb.X{ii}<GustWidth);
+            V_b(index1) = V_b(index1) + RS*(U_final*Time(ii)-X_initial-vb.X{ii}(index1));
+            V_b(index2) = V_b(index2) + GR*U_final;
+            V_b(index3) = V_b(index3) + -RS*(U_final*Time(ii)-X_initial-vb.X{ii}(index3)-GustWidth);
+            % shed vortices
+            index1=find(U_final*Time(ii)-X_initial-vs.X{ii}<GR*U_final/RS & U_final*Time(ii)-X_initial-vs.X{ii}>0);
+            index2=find(U_final*Time(ii)-X_initial-vs.X{ii}>GR*U_final/RS & U_final*Time(ii)-X_initial-vs.X{ii}<GustWidth-GR*U_final/RS);
+            index3=find(U_final*Time(ii)-X_initial-vs.X{ii}>GustWidth-GR*U_final/RS & U_final*Time(ii)-X_initial-vs.X{ii}<GustWidth);
+            V_s(index1) = V_s(index1) + RS*(U_final*Time(ii)-X_initial-vs.X{ii}(index1));
+            V_s(index2) = V_s(index2) + GR*U_final;
+            V_s(index3) = V_s(index3) + -RS*(U_final*Time(ii)-X_initial-vs.X{ii}(index3)-GustWidth);
         end
     end
     %% Find the normal velocity at the control points in
     [~,c_v_b] = FindRelFlowVel(c.X{ii},c.Y{ii}, vs.X{ii}, vs.Y{ii}, vs.G{ii},r_c,U(ii),V_cp,alpha(ii),c.Vp_b{ii});
     
-    %% In this bit, I place nascent tvortex according to Ansari
-    if ii>1
-        [A,vb.X{ii},vb.Y{ii}]=AnsariPlacement(A,vb.X{ii},vb.Y{ii},c.X{ii},c.Y{ii},vs.X{ii},vs.Y{ii},r_c,alpha(ii),Opt);
-    end
+%     %% In this bit, I place nascent the vortex according to Ansari
+%     if ii>1
+%         [A,vb.X{ii},vb.Y{ii}]=AnsariPlacement(A,vb.X{ii},vb.Y{ii},c.X{ii},c.Y{ii},vs.X{ii},vs.Y{ii},r_c,alpha(ii),Opt);
+%     end
     
     %% Find the new bound vortex sheet strength
     %obtain value for new bound vortex sheet strength
@@ -298,10 +321,23 @@ for ii=1:length(U)
     drawnow;
     M(ii) = getframe(fig1);
     writeVideo(v,M(ii));
-    %% Shed a vortex from edges and propagate shed vortices
-    % Enforce the kutta condition at the trailing and leading edge and convect wake
-    [vs.X{ii+1}, vs.Y{ii+1}, vs.G{ii+1}] = Shedding(vs.X{ii}, vs.Y{ii}, vs.G{ii}, vb.X{ii}, vb.Y{ii}, vb.G{ii}, vs.u{ii}, vs.v{ii}, vb.u{ii}, vb.v{ii}, dt, Opt);
     
+    
+%     %% Shed a vortex from edges and propagate shed vortices
+%     % Enforce the kutta condition at the trailing and leading edge and convect wake
+%     [vs.X{ii+1}, vs.Y{ii+1}, vs.G{ii+1}] = Shedding(vs.X{ii}, vs.Y{ii}, vs.G{ii}, vb.X{ii}, vb.Y{ii}, vb.G{ii}, vs.u{ii}, vs.v{ii}, vb.u{ii}, vb.v{ii}, dt, Opt);
+    
+    
+    %% Shed a vortex from edges and propagate shed vortices
+if strcmp('On', Opt)
+    % Enforce the kutta condition at the trailing and leading edge and convect wake
+    [vs.X{ii+1}, vs.Y{ii+1}, vs.G{ii+1}] = LE_Shedding(vs.X{ii}, vs.Y{ii}, vs.G{ii}, vb.X{ii}, vb.Y{ii}, vb.G{ii}, vs.u{ii}, vs.v{ii}, vb.u{ii}, vb.v{ii}, dt);
+else
+    % Enforce the kutta condition at the trailing edge and convect wake
+    [vs.X{ii+1}, vs.Y{ii+1}, vs.G{ii+1}] = TE_Shedding(vs.X{ii}, vs.Y{ii}, vs.G{ii}, vb.X{ii}, vb.Y{ii}, vb.G{ii}, vs.u{ii}, vs.v{ii}, vb.u{ii}, vb.v{ii}, dt);
+end
+
+
     %% Move the wing in the inertial frame (pitching)
     % Control points
     [rc_x, rc_y] = Trans_bi(c.X_b{ii}-a,0, alpha(ii));
@@ -316,6 +352,14 @@ for ii=1:length(U)
     vb.X_b{ii+1} = vb.X_b{ii};
     vb.Y_b{ii+1} = vb.Y_b{ii};
     
+    
+    
+    % if closed-loop control is on, update the lit error
+    if strcmp('Closed-loop', PitchProfile)
+    eps = C_l_ref-C_l(ii);
+    omega_old = omega(ii);
+    alpha_old = alpha(ii);
+    end
 end
 close(v);
 
